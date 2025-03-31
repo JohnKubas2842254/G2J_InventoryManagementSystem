@@ -1,0 +1,19 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "G2J",
+            "database": "G2J_InventoryManagement",
+            "username": "root",
+            "connectionTimeout": 30,
+            "password": "2842254K"
+        }
+    ]
+}
