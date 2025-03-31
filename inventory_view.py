@@ -16,9 +16,9 @@ from tabulate import tabulate #type: ignore
 # Configuration for database connection
 DB_CONFIG = {
     "host": "localhost",
-    "user": "store_user",
-    "password": "store_password",
-    "database": "store_inventory",
+    "user": "root",
+    "password": "2842254K",
+    "database": "G2J_InventoryManagement",
     "charset": "utf8mb4",
     "cursorclass": pymysql.cursors.DictCursor
 }

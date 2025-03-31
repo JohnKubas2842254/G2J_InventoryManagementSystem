@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-G2J Inventory Management System - Reorder Generator
+G2J Inventory Management System - Store Reorder Generator
 
 This script processes sales data from an input.txt file (one UPC code per line),
-compares it with current inventory levels in the database, and generates
-a reorder list for products that fall below their reorder point.
+updates the store's inventory levels, and generates a reorder list for
+products that fall below their reorder thresholds.
 
 Usage:
     python reorder_generator.py [input_file] [output_file]
+
+Current Date: 2025-03-31
 """
 
 import sys
@@ -16,12 +18,12 @@ import pymysql #type: ignore
 from collections import Counter
 from datetime import datetime
 
-# Configuration - Should be moved to a config file in production
+# Configuration for database connection
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
     "password": "2842254K",
-    "database": "g2j_inventory",
+    "database": "G2J_InventoryManagement",
     "charset": "utf8mb4",
     "cursorclass": pymysql.cursors.DictCursor
 }
@@ -41,7 +43,7 @@ def count_sales(input_file):
     Read the input file and count occurrences of each UPC code.
     
     Args:
-        input_file (str): Path to the input file
+        input_file (str): Path to the input file containing one UPC per line
         
     Returns:
         Counter: Dictionary-like object with UPC codes as keys and quantities as values
@@ -81,7 +83,7 @@ def check_inventory_levels(connection, sales_data):
                 # Get product info from database
                 cursor.execute(
                     "SELECT product_id, product_name, current_quantity, reorder_point, " 
-                    "reorder_quantity, supplier_id FROM products WHERE upc = %s", 
+                    "reorder_quantity FROM products WHERE upc = %s", 
                     (upc,)
                 )
                 product = cursor.fetchone()
@@ -103,8 +105,7 @@ def check_inventory_levels(connection, sales_data):
                             'upc': upc,
                             'product_name': product['product_name'],
                             'current_quantity': new_quantity,
-                            'reorder_quantity': product['reorder_quantity'],
-                            'supplier_id': product['supplier_id']
+                            'reorder_quantity': product['reorder_quantity']
                         })
                 else:
                     print(f"Warning: Product with UPC {upc} not found in database.")
@@ -127,9 +128,13 @@ def generate_reorder_report(reorder_list, output_file):
         reorder_list (list): Items that need to be reordered
         output_file (str): Path to the output file
     """
+    current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
     if not reorder_list:
         print("No items need to be reordered.")
         with open(output_file, 'w') as file:
+            file.write(f"G2J INVENTORY MANAGEMENT SYSTEM - REORDER REPORT\n")
+            file.write(f"Generated on: {current_date}\n\n")
             file.write("No items need to be reordered.\n")
         return
     
@@ -137,14 +142,15 @@ def generate_reorder_report(reorder_list, output_file):
         with open(output_file, 'w') as file:
             # Write header
             file.write("G2J INVENTORY MANAGEMENT SYSTEM - REORDER REPORT\n")
-            file.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            file.write(f"Generated on: {current_date}\n")
+            file.write(f"Store Location: Gloria, Jamison and John's Store\n\n")
             file.write("-" * 80 + "\n")
-            file.write(f"{'PRODUCT ID':<12} {'UPC':<15} {'PRODUCT NAME':<30} {'CURRENT QTY':<12} {'REORDER QTY':<12} {'SUPPLIER ID':<12}\n")
+            file.write(f"{'PRODUCT ID':<12} {'UPC':<15} {'PRODUCT NAME':<30} {'CURRENT QTY':<12} {'REORDER QTY':<12}\n")
             file.write("-" * 80 + "\n")
             
             # Write each product that needs reordering
             for item in reorder_list:
-                file.write(f"{item['product_id']:<12} {item['upc']:<15} {item['product_name']:<30} {item['current_quantity']:<12} {item['reorder_quantity']:<12} {item['supplier_id']:<12}\n")
+                file.write(f"{item['product_id']:<12} {item['upc']:<15} {item['product_name']:<30} {item['current_quantity']:<12} {item['reorder_quantity']:<12}\n")
             
             file.write("-" * 80 + "\n")
             file.write(f"\nTotal items to reorder: {len(reorder_list)}\n")
@@ -167,12 +173,13 @@ def create_reorder_records(connection, reorder_list):
     
     try:
         with connection.cursor() as cursor:
+            current_date = datetime.now()
             for item in reorder_list:
                 # Create a reorder record in the database
                 cursor.execute(
-                    "INSERT INTO reorder_requests (product_id, quantity_requested, date_requested, status) "
+                    "INSERT INTO reorders (product_id, quantity, date_requested, status) "
                     "VALUES (%s, %s, %s, %s)",
-                    (item['product_id'], item['reorder_quantity'], datetime.now(), 'PENDING')
+                    (item['product_id'], item['reorder_quantity'], current_date, 'PENDING')
                 )
             
             # Commit the changes to the database

@@ -1,8 +1,8 @@
 -- G2J Inventory Management System Database Schema
 
 -- Create the database
-CREATE DATABASE IF NOT EXISTS g2j_inventory;
-USE g2j_inventory;
+CREATE DATABASE IF NOT EXISTS G2J_InventoryManagement;
+USE G2J_InventoryManagement;
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
