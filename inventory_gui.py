@@ -146,7 +146,7 @@ class InventoryApp(tk.Tk):
                 products = cursor.fetchall()
                 
                 # Debug: Print the results to the terminal
-                print(f"Search results for '{search_term}': {products}")
+                print(f"Search results for '{search_term}': \n {products} \n")
                 
                 return products
         except pymysql.MySQLError as e:
@@ -339,7 +339,7 @@ class DashboardFrame(ttk.Frame):
         """Show a popup window to select a product from the search results."""
         popup = tk.Toplevel(self)
         popup.title("Select a Product")
-        popup.geometry("400x300")
+        popup.geometry("600x400")  # Set a larger default size for the popup window
         
         # Add a label
         label = ttk.Label(popup, text="Select a product from the list below:")
@@ -354,8 +354,8 @@ class DashboardFrame(ttk.Frame):
         
         tree.column("ID", width=50)
         tree.column("UPC", width=100)
-        tree.column("Name", width=200)
-        tree.column("Quantity", width=50)
+        tree.column("Name", width=300)
+        tree.column("Quantity", width=100)
         
         # Add products to the treeview
         for product in products:
