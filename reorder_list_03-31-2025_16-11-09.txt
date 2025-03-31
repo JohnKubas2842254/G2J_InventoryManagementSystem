@@ -1,0 +1,22 @@
+G2J INVENTORY MANAGEMENT SYSTEM - REORDER REPORT
+Generated on: 2025-03-31 16:11:09
+Store Location: Gloria, Jamison and John's Store
+
+--------------------------------------------------------------------------------
+PRODUCT ID   UPC             PRODUCT NAME                   CURRENT QTY  REORDER QTY 
+--------------------------------------------------------------------------------
+10           715141627039    Large Brown Eggs               0            15          
+3            345678901234    Eggs (dozen)                   -8           20          
+11           715141328615    Jumbo White Eggs               -9           18          
+17           722252369840    Clif Bars Peanut Butter        -9           12          
+6            678901234567    Chicken Breast                 6            20          
+13           074590516654    Quaker Instant Oatmeal         -4           15          
+14           041457878026    Honey Nut Cheerios             7            15          
+5            567890123456    Ground Beef                    -18          15          
+12           696551750930    A & W Root Beer Soda 12 Pack   -8           10          
+8            890123456789    Tomato Sauce                   1            20          
+15           030100062134    Rice Krispies Treats Bars      3            20          
+9            037000941514    Charmin Ultra-Strong Toilet Paper 0            12          
+--------------------------------------------------------------------------------
+
+Total items to reorder: 12

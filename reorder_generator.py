@@ -122,38 +122,32 @@ def check_inventory_levels(connection, sales_data):
 
 def generate_reorder_report(reorder_list, output_file):
     """
-    Generate a reorder report and save to the output file.
+    Generate a reorder report and save to the output file in the format of the input file.
     
     Args:
         reorder_list (list): Items that need to be reordered
         output_file (str): Path to the output file
     """
-    current_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
     if not reorder_list:
         print("No items need to be reordered.")
         with open(output_file, 'w') as file:
-            file.write(f"G2J INVENTORY MANAGEMENT SYSTEM - REORDER REPORT\n")
-            file.write(f"Generated on: {current_date}\n\n")
             file.write("No items need to be reordered.\n")
         return
     
     try:
         with open(output_file, 'w') as file:
-            # Write header
-            file.write("G2J INVENTORY MANAGEMENT SYSTEM - REORDER REPORT\n")
-            file.write(f"Generated on: {current_date}\n")
-            file.write(f"Store Location: Gloria, Jamison and John's Store\n\n")
-            file.write("-" * 80 + "\n")
-            file.write(f"{'PRODUCT ID':<12} {'UPC':<15} {'PRODUCT NAME':<30} {'CURRENT QTY':<12} {'REORDER QTY':<12}\n")
-            file.write("-" * 80 + "\n")
-            
-            # Write each product that needs reordering
+            # Write each UPC to the file based on the reorder quantity
             for item in reorder_list:
-                file.write(f"{item['product_id']:<12} {item['upc']:<15} {item['product_name']:<30} {item['current_quantity']:<12} {item['reorder_quantity']:<12}\n")
-            
-            file.write("-" * 80 + "\n")
-            file.write(f"\nTotal items to reorder: {len(reorder_list)}\n")
+                upc = item['upc']
+                reorder_quantity = item['reorder_quantity']
+                case_size = item.get('case_size', 1)  # Default case size to 1 if not provided
+                
+                # Calculate the number of cases to order
+                num_cases = (reorder_quantity + case_size - 1) // case_size  # Round up to the nearest case
+                
+                # Write the UPC to the file for each case
+                for _ in range(num_cases):
+                    file.write(f"{upc}\n")
         
         print(f"Reorder report generated successfully: {output_file}")
     except Exception as e:
@@ -194,12 +188,15 @@ def create_reorder_records(connection, reorder_list):
 def main():
     """Main function to orchestrate the reorder generation process."""
     # Check command line arguments
-    if len(sys.argv) != 3:
-        print("Usage: python reorder_generator.py [input_file] [output_file]")
+    if len(sys.argv) != 2:
+        print("Usage: python reorder_generator.py [input_file]")
         sys.exit(1)
     
     input_file = sys.argv[1]
-    output_file = sys.argv[2]
+    
+    # Generate the output file name based on the current date and time
+    current_time = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
+    output_file = f"reorder_list_{current_time}.txt"
     
     print(f"Starting reorder generation process...")
     print(f"Input file: {input_file}")
