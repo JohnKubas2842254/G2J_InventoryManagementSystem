@@ -13,7 +13,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
-import pymysql
+import pymysql #type: ignore
 import re
 
 # Application Constants
@@ -23,9 +23,9 @@ WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 DB_CONFIG = {
     "host": "localhost",
-    "user": "store_user",
-    "password": "store_password",
-    "database": "store_inventory",
+    "user": "root",
+    "password": "2842254K",
+    "database": "G2J_InventoryManagement",
     "charset": "utf8mb4",
     "cursorclass": pymysql.cursors.DictCursor
 }
@@ -71,6 +71,9 @@ class InventoryApp(tk.Tk):
                              font=('Arial', 12, 'bold'), 
                              background="#f0f0f0")
         
+        # Connect to database
+        self.db_connection = self.connect_to_database()
+        
         # Create main container
         self.main_container = ttk.Frame(self)
         self.main_container.pack(fill=tk.BOTH, expand=True)
@@ -90,9 +93,6 @@ class InventoryApp(tk.Tk):
         
         # Show dashboard by default
         self.show_frame("DashboardFrame")
-        
-        # Connect to database
-        self.db_connection = self.connect_to_database()
     
     def show_frame(self, frame_name):
         """Switch to the specified frame."""
@@ -111,81 +111,79 @@ class InventoryApp(tk.Tk):
             messagebox.showerror("Database Connection Error", 
                                 f"Error connecting to the database: {e}")
             return None
-    
-    def search_product(self, search_term):
-        """Search for a product in the database."""
+        
+    def get_reports(self):
+        """Retrieve reports from the database."""
         if not self.db_connection:
-            messagebox.showerror("Database Error", "Not connected to database")
-            return None
+            messagebox.showerror("Database Error", "No database connection available.")
+            return []
         
         try:
             with self.db_connection.cursor() as cursor:
-                # Try to match UPC first
-                cursor.execute(
-                    "SELECT * FROM products WHERE upc = %s OR product_name LIKE %s LIMIT 1", 
-                    (search_term, f"%{search_term}%")
-                )
-                result = cursor.fetchone()
-                return result
+                cursor.execute("SELECT report_name AS name, report_date AS date, report_file AS file FROM reports")
+                reports = cursor.fetchall()
+                return reports
         except pymysql.MySQLError as e:
-            messagebox.showerror("Database Error", f"Error searching for product: {e}")
-            return None
-    
-    def get_product(self, product_id):
-        """Get a product by its ID."""
+            messagebox.showerror("Database Error", f"Error retrieving reports: {e}")
+            return []
+        
+    def search_product(self, search_term):
+        """Search for products by UPC or name."""
         if not self.db_connection:
-            messagebox.showerror("Database Error", "Not connected to database")
-            return None
-            
+            messagebox.showerror("Database Error", "No database connection available.")
+            return []
+        
         try:
             with self.db_connection.cursor() as cursor:
-                cursor.execute("SELECT * FROM products WHERE product_id = %s", (product_id,))
-                return cursor.fetchone()
-        except pymysql.MySQLError as e:
-            messagebox.showerror("Database Error", f"Error retrieving product: {e}")
-            return None
-    
-    def update_product(self, product_id, data):
-        """Update product information in the database."""
-        if not self.db_connection:
-            messagebox.showerror("Database Error", "Not connected to database")
-            return False
-            
-        try:
-            with self.db_connection.cursor() as cursor:
+                # Search for products by UPC or name
                 query = """
-                UPDATE products 
-                SET product_name = %s, description = %s, category = %s,
-                    current_quantity = %s, reorder_point = %s, 
-                    reorder_quantity = %s, unit_price = %s
-                WHERE product_id = %s
+                    SELECT product_id, upc, product_name, description, current_quantity, 
+                           category, reorder_point, reorder_quantity, unit_price
+                    FROM products 
+                    WHERE upc LIKE %s OR product_name LIKE %s
                 """
-                cursor.execute(query, (
-                    data['product_name'], 
-                    data['description'], 
-                    data['category'],
-                    data['current_quantity'], 
-                    data['reorder_point'], 
-                    data['reorder_quantity'], 
-                    data['unit_price'],
+                cursor.execute(query, (f"%{search_term}%", f"%{search_term}%"))
+                products = cursor.fetchall()
+                
+                # Debug: Print the results to the terminal
+                print(f"Search results for '{search_term}': {products}")
+                
+                return products
+        except pymysql.MySQLError as e:
+            messagebox.showerror("Database Error", f"Error searching for products: {e}")
+            return []
+        
+    def update_product(self, product_id, product_data):
+        """Update product details in the database."""
+        if not self.db_connection:
+            messagebox.showerror("Database Error", "No database connection available.")
+            return False
+        
+        try:
+            with self.db_connection.cursor() as cursor:
+                # Prepare SQL update statement
+                sql = """
+                    UPDATE products 
+                    SET product_name = %s, description = %s, category = %s, 
+                        current_quantity = %s, reorder_point = %s, 
+                        reorder_quantity = %s, unit_price = %s 
+                    WHERE product_id = %s
+                """
+                cursor.execute(sql, (
+                    product_data["product_name"],
+                    product_data["description"],
+                    product_data["category"],
+                    product_data["current_quantity"],
+                    product_data["reorder_point"],
+                    product_data["reorder_quantity"],
+                    product_data["unit_price"],
                     product_id
                 ))
                 self.db_connection.commit()
                 return True
         except pymysql.MySQLError as e:
-            self.db_connection.rollback()
             messagebox.showerror("Database Error", f"Error updating product: {e}")
             return False
-    
-    def get_reports(self):
-        """Get a list of available reports."""
-        # In a real application, this would retrieve reports from a directory or database
-        # For now, let's simulate some reports
-        return [
-            {"name": "Inventory Report", "date": "2025-03-31", "file": "inventory_report.txt"},
-            {"name": "Reorder Report", "date": "2025-03-31", "file": "reorder_report.txt"},
-            {"name": "Sales Report", "date": "2025-03-30", "file": "sales_report.txt"}
-        ]
 
 
 class DashboardFrame(ttk.Frame):
@@ -286,24 +284,27 @@ class DashboardFrame(ttk.Frame):
         self.load_recent_products()
     
     def search_product(self):
-        """Search for a product and navigate to configuration screen if found."""
+        """Search for products and display matching results."""
         search_term = self.search_entry.get().strip()
         if not search_term:
             messagebox.showinfo("Search", "Please enter a UPC or product name")
             return
         
         # Call controller's search method
-        product = self.controller.search_product(search_term)
+        products = self.controller.search_product(search_term)
         
-        if product:
-            # Set the current product in the configuration frame
-            config_frame = self.controller.frames["ConfigurationFrame"]
-            config_frame.load_product(product)
-            
-            # Show the configuration frame
-            self.controller.show_frame("ConfigurationFrame")
+        if not products:
+            messagebox.showinfo("Search", "No products found matching the search term")
+            return
+        
+        if len(products) == 1:
+            # If only one product is found, navigate directly to the configuration frame
+            print("Only one product found. Navigating to configuration frame.")
+            self.open_product_config(products[0])
         else:
-            messagebox.showinfo("Search", "No product found with that UPC or name")
+            # If multiple products are found, show a selection popup
+            print(f"Multiple products found: {len(products)}. Showing selection popup.")
+            self.show_product_selection_popup(products)
     
     def load_recent_products(self):
         """Load recent products into the treeview."""
@@ -334,26 +335,82 @@ class DashboardFrame(ttk.Frame):
         except pymysql.MySQLError as e:
             messagebox.showerror("Database Error", f"Error loading products: {e}")
     
-    def open_product_config(self, event):
-        """Open the configuration screen for the selected product."""
-        # Get selected item
-        selection = self.products_tree.selection()
-        if not selection:
-            return
-            
-        # Get product ID from the selected item
-        item = self.products_tree.item(selection[0])
-        product_id = item["values"][0]
+    def show_product_selection_popup(self, products):
+        """Show a popup window to select a product from the search results."""
+        popup = tk.Toplevel(self)
+        popup.title("Select a Product")
+        popup.geometry("400x300")
         
-        # Get the product data
-        product = self.controller.get_product(product_id)
+        # Add a label
+        label = ttk.Label(popup, text="Select a product from the list below:")
+        label.pack(pady=10)
+        
+        # Create a treeview to display the products
+        tree = ttk.Treeview(popup, columns=("ID", "UPC", "Name", "Quantity"), show="headings", height=10)
+        tree.heading("ID", text="ID")
+        tree.heading("UPC", text="UPC")
+        tree.heading("Name", text="Product Name")
+        tree.heading("Quantity", text="Quantity")
+        
+        tree.column("ID", width=50)
+        tree.column("UPC", width=100)
+        tree.column("Name", width=200)
+        tree.column("Quantity", width=50)
+        
+        # Add products to the treeview
+        for product in products:
+            tree.insert("", "end", values=(
+                product["product_id"],
+                product["upc"],
+                product["product_name"],
+                product["current_quantity"]
+            ))
+        
+        tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Add a button to confirm selection
+        select_button = ttk.Button(popup, text="Select", command=lambda: self.select_product_from_popup(tree, popup))
+        select_button.pack(pady=10)
+
+    def select_product_from_popup(self, tree, popup):
+        """Handle product selection from the popup."""
+        # Get the selected item
+        selection = tree.selection()
+        if not selection:
+            messagebox.showinfo("Selection", "Please select a product")
+            return
+        
+        # Get product data from the selected item
+        item = tree.item(selection[0])
+        product_id = item["values"][0]  # Get the product ID from the selected row
+        
+        # Retrieve the full product data using the product ID
+        try:
+            with self.controller.db_connection.cursor() as cursor:
+                query = """
+                    SELECT product_id, upc, product_name, description, current_quantity, 
+                           category, reorder_point, reorder_quantity, unit_price
+                    FROM products 
+                    WHERE product_id = %s
+                """
+                cursor.execute(query, (product_id,))
+                product = cursor.fetchone()
+        except pymysql.MySQLError as e:
+            messagebox.showerror("Database Error", f"Error retrieving product: {e}")
+            return
+        
         if product:
-            # Set the product in the configuration frame
-            config_frame = self.controller.frames["ConfigurationFrame"]
-            config_frame.load_product(product)
-            
-            # Show the configuration frame
-            self.controller.show_frame("ConfigurationFrame")
+            # Open the product configuration frame
+            self.open_product_config(product)
+        
+        # Close the popup
+        popup.destroy()
+
+    def open_product_config(self, product):
+        """Open the configuration screen for the selected product."""
+        config_frame = self.controller.frames["ConfigurationFrame"]
+        config_frame.load_product(product)
+        self.controller.show_frame("ConfigurationFrame")
 
 
 class ConfigurationFrame(ttk.Frame):
@@ -519,4 +576,180 @@ class ConfigurationFrame(ttk.Frame):
         
         if success:
             messagebox.showinfo("Success", "Product updated successfully")
-            # Update the current product with new
+            # Update the current product with new values
+            self.current_product.update(product_data)
+
+
+class ReportsFrame(ttk.Frame):
+    """Reports viewing frame."""
+    
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        
+        # Configure the frame
+        self.configure(padding="20", style="TFrame")
+        
+        # Create header
+        header_frame = ttk.Frame(self)
+        header_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        back_button = ttk.Button(header_frame, text="← Back", 
+                                command=lambda: controller.show_frame("DashboardFrame"))
+        back_button.pack(side=tk.LEFT)
+        
+        header_label = ttk.Label(header_frame, text="Reports",
+                                style="Header.TLabel")
+        header_label.pack(side=tk.LEFT, padx=20)
+        
+        # Reports list frame
+        reports_frame = ttk.Frame(self)
+        reports_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Create a treeview to display reports
+        self.reports_tree = ttk.Treeview(reports_frame, 
+                                        columns=("Name", "Date"), 
+                                        show="headings", 
+                                        height=10)
+        
+        # Define headings
+        self.reports_tree.heading("Name", text="Report Name")
+        self.reports_tree.heading("Date", text="Date")
+        
+        # Configure columns
+        self.reports_tree.column("Name", width=400)
+        self.reports_tree.column("Date", width=150)
+        
+        # Add scrollbar
+        reports_scrollbar = ttk.Scrollbar(reports_frame, orient="vertical", 
+                                        command=self.reports_tree.yview)
+        self.reports_tree.configure(yscrollcommand=reports_scrollbar.set)
+        
+        # Pack the treeview and scrollbar
+        self.reports_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        reports_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Bind double-click event to view report
+        self.reports_tree.bind("<Double-1>", self.view_report)
+        
+        # Action buttons frame
+        buttons_frame = ttk.Frame(self)
+        buttons_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        view_button = ttk.Button(buttons_frame, text="View Report", 
+                               command=self.view_selected_report)
+        view_button.pack(side=tk.RIGHT)
+        
+        # Load reports when showing this frame
+        self.load_reports()
+    
+    def on_show(self):
+        """Called when this frame is shown."""
+        # Refresh the reports list
+        self.load_reports()
+    
+    def load_reports(self):
+        """Load reports into the treeview."""
+        # Clear existing items
+        for item in self.reports_tree.get_children():
+            self.reports_tree.delete(item)
+        
+        # Get reports from controller
+        reports = self.controller.get_reports()
+        
+        # Add reports to treeview
+        for report in reports:
+            self.reports_tree.insert("", "end", values=(
+                report["name"],
+                report["date"]
+            ), tags=(report["file"],))
+    
+    def view_selected_report(self):
+        """View the selected report."""
+        # Get selected item
+        selection = self.reports_tree.selection()
+        if not selection:
+            messagebox.showinfo("Selection", "Please select a report to view")
+            return
+            
+        # Get the report file
+        item = self.reports_tree.item(selection[0])
+        report_file = self.reports_tree.item(selection[0], "tags")[0]
+        
+        # View the report
+        self.view_report_file(report_file)
+    
+    def view_report(self, event):
+        """Handle double-click on a report item."""
+        selection = self.reports_tree.selection()
+        if not selection:
+            return
+            
+        # Get the report file
+        report_file = self.reports_tree.item(selection[0], "tags")[0]
+        
+        # View the report
+        self.view_report_file(report_file)
+    
+    def view_report_file(self, report_file):
+        """Open a window to display the report content."""
+        try:
+            # Check if the file exists
+            if os.path.exists(report_file):
+                with open(report_file, "r") as f:
+                    content = f.read()
+            else:
+                # For demo purposes, create sample content
+                content = f"This is a sample {report_file} content.\n\n"
+                content += "Generated on: 2025-03-31\n\n"
+                
+                if "inventory" in report_file.lower():
+                    content += "Inventory Status:\n"
+                    content += "----------------\n"
+                    content += "1. Milk (1 gallon) - 50 units\n"
+                    content += "2. Bread (White) - 35 units\n"
+                    content += "3. Eggs (dozen) - 20 units\n"
+                    content += "4. Bananas - 45 units\n"
+                    content += "5. Ground Beef - 12 units\n"
+                    content += "6. Chicken Breast - 18 units\n"
+                    content += "7. Pasta (1 lb) - 40 units\n"
+                    content += "8. Tomato Sauce - 25 units\n"
+                elif "reorder" in report_file.lower():
+                    content += "Items to Reorder:\n"
+                    content += "----------------\n"
+                    content += "1. Ground Beef - Current: 12, Reorder Point: 15\n"
+                    content += "2. Chicken Breast - Current: 18, Reorder Point: 20\n"
+                else:
+                    content += "Sales Summary:\n"
+                    content += "-------------\n"
+                    content += "1. Milk (1 gallon) - 20 units sold\n"
+                    content += "2. Bread (White) - 15 units sold\n"
+                    content += "3. Eggs (dozen) - 10 units sold\n"
+                    content += "4. Bananas - 30 units sold\n"
+            
+            # Create a new window
+            report_window = tk.Toplevel(self)
+            report_window.title(f"Report: {report_file}")
+            report_window.geometry("600x400")
+            
+            # Add a text widget to display the content
+            text_widget = tk.Text(report_window, wrap="word", padx=10, pady=10)
+            text_widget.pack(fill=tk.BOTH, expand=True)
+            
+            # Add scrollbar
+            scrollbar = ttk.Scrollbar(text_widget, command=text_widget.yview)
+            text_widget.configure(yscrollcommand=scrollbar.set)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # Insert content
+            text_widget.insert("1.0", content)
+            text_widget.configure(state="disabled")  # Make it read-only
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error viewing report: {e}")
+
+
+# Run the application if this script is executed directly
+if __name__ == "__main__":
+    app = InventoryApp()
+    app.mainloop()
