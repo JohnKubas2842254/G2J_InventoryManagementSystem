@@ -7,9 +7,7 @@ updates the store's inventory levels, and generates a reorder list for
 products that fall below their reorder thresholds.
 
 Usage:
-    python reorder_generator.py [input_file] [output_file]
-
-Current Date: 2025-03-31
+    python reorder_generator.py [input_file]
 """
 
 import sys
@@ -194,9 +192,11 @@ def main():
     
     input_file = sys.argv[1]
     
+    output_files_directory = "/Users/kube/VSprojects/G2J_InventoryManagementSystem/ReOrder_Lists"
+    os.makedirs(output_files_directory, exist_ok=True)
     # Generate the output file name based on the current date and time
     current_time = datetime.now().strftime("%m-%d-%Y_%H-%M-%S")
-    output_file = f"reorder_list_{current_time}.txt"
+    output_file = os.path.join(output_files_directory, f"reorder_list_{current_time}.txt")
     
     print(f"Starting reorder generation process...")
     print(f"Input file: {input_file}")

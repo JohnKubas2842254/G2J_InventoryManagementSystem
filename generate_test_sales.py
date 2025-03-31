@@ -6,8 +6,6 @@ This script generates random sales data for testing the reorder system.
 
 Usage:
     python generate_test_sales.py [number_of_sales] [output_file]
-
-Current Date: 2025-03-31
 """
 
 import sys

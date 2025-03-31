@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 G2J Inventory Management System - GUI Application
-Date: 2025-03-31
 
 This script provides a graphical user interface for the G2J Inventory
 Management System, allowing users to search for products, update

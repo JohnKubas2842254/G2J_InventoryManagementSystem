@@ -6,8 +6,6 @@ This script displays the current inventory levels and reorder status.
 
 Usage:
     python inventory_view.py
-
-Current Date: 2025-03-31
 """
 
 import pymysql #type: ignore
