@@ -146,7 +146,7 @@ class InventoryApp(tk.Tk):
                 products = cursor.fetchall()
                 
                 # Debug: Print the results to the terminal
-                print(f"Search results for '{search_term}': \n {products} \n")
+                print(f"Search results for '{search_term}': \n {products}")
                 
                 return products
         except pymysql.MySQLError as e:
