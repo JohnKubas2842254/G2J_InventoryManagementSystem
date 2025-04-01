@@ -4,7 +4,7 @@ G2J Inventory Management System - Store Reorder Generator
 
 This script processes sales data from an input.txt file (one UPC code per line),
 updates the store's inventory levels, and generates a reorder list for
-products that fall below their reorder thresholds.
+products when the number of units sold reaches a multiple of the case size.
 
 Usage:
     python reorder_generator.py [input_file]
@@ -64,7 +64,8 @@ def count_sales(input_file):
 
 def check_inventory_levels(connection, sales_data):
     """
-    Check current inventory levels against sales data to determine what needs reordering.
+    Check current inventory levels against sales data to determine what needs reordering
+    based on case size logic.
     
     Args:
         connection: Database connection
@@ -74,14 +75,14 @@ def check_inventory_levels(connection, sales_data):
         list: Items that need to be reordered with their details
     """
     reorder_list = []
+    products_with_cases_consumed = {}
     
     try:
         with connection.cursor() as cursor:
             for upc, quantity_sold in sales_data.items():
                 # Get product info from database
                 cursor.execute(
-                    "SELECT product_id, product_name, current_quantity, reorder_point, " 
-                    "reorder_quantity FROM products WHERE upc = %s", 
+                    "SELECT product_id, product_name, current_quantity, case_size FROM products WHERE upc = %s", 
                     (upc,)
                 )
                 product = cursor.fetchone()
@@ -96,17 +97,29 @@ def check_inventory_levels(connection, sales_data):
                         (new_quantity, product['product_id'])
                     )
                     
-                    # Check if reorder is needed
-                    if new_quantity <= product['reorder_point']:
-                        reorder_list.append({
-                            'product_id': product['product_id'],
-                            'upc': upc,
-                            'product_name': product['product_name'],
-                            'current_quantity': new_quantity,
-                            'reorder_quantity': product['reorder_quantity']
-                        })
+                    # Check if the number of units sold is a multiple of case size
+                    if product['case_size'] > 0 and quantity_sold % product['case_size'] == 0:
+                        cases_consumed = quantity_sold // product['case_size']
+                        
+                        # Only add to reorder list if at least one full case was consumed
+                        if cases_consumed > 0:
+                            # We'll track the number of cases consumed for this product
+                            if product['product_id'] in products_with_cases_consumed:
+                                products_with_cases_consumed[product['product_id']]['cases_consumed'] += cases_consumed
+                            else:
+                                products_with_cases_consumed[product['product_id']] = {
+                                    'product_id': product['product_id'],
+                                    'upc': upc,
+                                    'product_name': product['product_name'],
+                                    'current_quantity': new_quantity,
+                                    'case_size': product['case_size'],
+                                    'cases_consumed': cases_consumed
+                                }
                 else:
                     print(f"Warning: Product with UPC {upc} not found in database.")
+            
+            # Add all products that had at least one full case consumed to the reorder list
+            reorder_list = list(products_with_cases_consumed.values())
             
             # Commit the changes to the database
             connection.commit()
@@ -120,7 +133,8 @@ def check_inventory_levels(connection, sales_data):
 
 def generate_reorder_report(reorder_list, output_file):
     """
-    Generate a reorder report and save to the output file in the format of the input file.
+    Generate a reorder report and save to the output file.
+    For each case consumed, output the UPC once.
     
     Args:
         reorder_list (list): Items that need to be reordered
@@ -134,17 +148,12 @@ def generate_reorder_report(reorder_list, output_file):
     
     try:
         with open(output_file, 'w') as file:
-            # Write each UPC to the file based on the reorder quantity
             for item in reorder_list:
                 upc = item['upc']
-                reorder_quantity = item['reorder_quantity']
-                case_size = item.get('case_size', 1)  # Default case size to 1 if not provided
+                cases_consumed = item['cases_consumed']
                 
-                # Calculate the number of cases to order
-                num_cases = (reorder_quantity + case_size - 1) // case_size  # Round up to the nearest case
-                
-                # Write the UPC to the file for each case
-                for _ in range(num_cases):
+                # Write one line per case consumed
+                for _ in range(cases_consumed):
                     file.write(f"{upc}\n")
         
         print(f"Reorder report generated successfully: {output_file}")
@@ -167,11 +176,13 @@ def create_reorder_records(connection, reorder_list):
         with connection.cursor() as cursor:
             current_date = datetime.now()
             for item in reorder_list:
-                # Create a reorder record in the database
+                # Create a reorder record in the database based on cases consumed
+                quantity_to_order = item['cases_consumed'] * item['case_size']
+                
                 cursor.execute(
                     "INSERT INTO reorders (product_id, quantity, date_requested, status) "
                     "VALUES (%s, %s, %s, %s)",
-                    (item['product_id'], item['reorder_quantity'], current_date, 'PENDING')
+                    (item['product_id'], quantity_to_order, current_date, 'PENDING')
                 )
             
             # Commit the changes to the database

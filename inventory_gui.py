@@ -137,7 +137,7 @@ class InventoryApp(tk.Tk):
                 # Search for products by UPC or name
                 query = """
                     SELECT product_id, upc, product_name, description, current_quantity, 
-                           category, reorder_point, reorder_quantity, unit_price
+                           category, case_size, unit_price
                     FROM products 
                     WHERE upc LIKE %s OR product_name LIKE %s
                 """
@@ -164,8 +164,7 @@ class InventoryApp(tk.Tk):
                 sql = """
                     UPDATE products 
                     SET product_name = %s, description = %s, category = %s, 
-                        current_quantity = %s, reorder_point = %s, 
-                        reorder_quantity = %s, unit_price = %s 
+                        current_quantity = %s, case_size = %s, unit_price = %s 
                     WHERE product_id = %s
                 """
                 cursor.execute(sql, (
@@ -173,8 +172,7 @@ class InventoryApp(tk.Tk):
                     product_data["description"],
                     product_data["category"],
                     product_data["current_quantity"],
-                    product_data["reorder_point"],
-                    product_data["reorder_quantity"],
+                    product_data["case_size"],
                     product_data["unit_price"],
                     product_id
                 ))
@@ -276,6 +274,15 @@ class DashboardFrame(ttk.Frame):
         
         # Load recent products when showing this frame
         self.load_recent_products()
+
+        # Add "Enter New Item" button
+        new_item_button = ttk.Button(self, text="Enter New Item", command=self.open_new_item_window)
+        new_item_button.pack(pady=(10, 0))  # Add some padding below the button
+
+    def open_new_item_window(self):
+        """Open a window to add a new product."""
+        NewItemWindow(self.controller)
+        
     
     def on_show(self):
         """Called when this frame is shown."""
@@ -388,7 +395,7 @@ class DashboardFrame(ttk.Frame):
             with self.controller.db_connection.cursor() as cursor:
                 query = """
                     SELECT product_id, upc, product_name, description, current_quantity, 
-                           category, reorder_point, reorder_quantity, unit_price
+                           category, case_size, unit_price
                     FROM products 
                     WHERE product_id = %s
                 """
@@ -488,21 +495,13 @@ class ConfigurationFrame(ttk.Frame):
         self.qty_var = tk.StringVar()
         ttk.Entry(qty_frame, textvariable=self.qty_var, width=10).pack(side=tk.LEFT)
         
-        # Reorder Point
-        reorder_point_frame = ttk.Frame(self.product_frame)
-        reorder_point_frame.pack(fill=tk.X, pady=5)
+        # Case Size
+        case_size_frame = ttk.Frame(self.product_frame)
+        case_size_frame.pack(fill=tk.X, pady=5)
         
-        ttk.Label(reorder_point_frame, text="Reorder Point:", width=15).pack(side=tk.LEFT)
-        self.reorder_point_var = tk.StringVar()
-        ttk.Entry(reorder_point_frame, textvariable=self.reorder_point_var, width=10).pack(side=tk.LEFT)
-        
-        # Reorder Quantity
-        reorder_qty_frame = ttk.Frame(self.product_frame)
-        reorder_qty_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(reorder_qty_frame, text="Reorder Quantity:", width=15).pack(side=tk.LEFT)
-        self.reorder_qty_var = tk.StringVar()
-        ttk.Entry(reorder_qty_frame, textvariable=self.reorder_qty_var, width=10).pack(side=tk.LEFT)
+        ttk.Label(case_size_frame, text="Case Size:", width=15).pack(side=tk.LEFT)
+        self.case_size_var = tk.StringVar()
+        ttk.Entry(case_size_frame, textvariable=self.case_size_var, width=10).pack(side=tk.LEFT)
         
         # Unit Price
         price_frame = ttk.Frame(self.product_frame)
@@ -536,8 +535,7 @@ class ConfigurationFrame(ttk.Frame):
             
         self.category_var.set(product["category"] or "")
         self.qty_var.set(product["current_quantity"])
-        self.reorder_point_var.set(product["reorder_point"])
-        self.reorder_qty_var.set(product["reorder_quantity"])
+        self.case_size_var.set(product["case_size"])
         self.price_var.set(product["unit_price"])
     
     def save_product(self):
@@ -548,12 +546,11 @@ class ConfigurationFrame(ttk.Frame):
         # Validate inputs
         try:
             current_quantity = int(self.qty_var.get())
-            reorder_point = int(self.reorder_point_var.get())
-            reorder_quantity = int(self.reorder_qty_var.get())
+            case_size = int(self.case_size_var.get())
             unit_price = float(self.price_var.get())
             
-            if current_quantity < 0 or reorder_point < 0 or reorder_quantity < 0 or unit_price < 0:
-                raise ValueError("Values cannot be negative")
+            if current_quantity < 0 or case_size < 1 or unit_price < 0:
+                raise ValueError("Values cannot be negative and case size must be at least 1")
                 
         except ValueError as e:
             messagebox.showerror("Input Error", f"Invalid numeric input: {e}")
@@ -565,8 +562,7 @@ class ConfigurationFrame(ttk.Frame):
             "description": self.desc_text.get("1.0", tk.END).strip(),
             "category": self.category_var.get(),
             "current_quantity": current_quantity,
-            "reorder_point": reorder_point,
-            "reorder_quantity": reorder_quantity,
+            "case_size": case_size,
             "unit_price": unit_price
         }
         
@@ -716,8 +712,8 @@ class ReportsFrame(ttk.Frame):
                 elif "reorder" in report_file.lower():
                     content += "Items to Reorder:\n"
                     content += "----------------\n"
-                    content += "1. Ground Beef - Current: 12, Reorder Point: 15\n"
-                    content += "2. Chicken Breast - Current: 18, Reorder Point: 20\n"
+                    content += "1. Ground Beef - Current: 12, Case Size: 15\n"
+                    content += "2. Chicken Breast - Current: 18, Case Size: 20\n"
                 else:
                     content += "Sales Summary:\n"
                     content += "-------------\n"
@@ -747,6 +743,92 @@ class ReportsFrame(ttk.Frame):
         except Exception as e:
             messagebox.showerror("Error", f"Error viewing report: {e}")
 
+class NewItemWindow(tk.Toplevel):
+    """Window for entering a new product into the database."""
+    
+    def __init__(self, controller):
+        super().__init__()
+        self.controller = controller
+        self.title("Enter New Item")
+        self.geometry("400x400")
+        
+        # Create input fields for product details
+        ttk.Label(self, text="UPC:").pack(pady=5, anchor=tk.W)
+        self.upc_var = tk.StringVar()
+        ttk.Entry(self, textvariable=self.upc_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Product Name:").pack(pady=5, anchor=tk.W)
+        self.name_var = tk.StringVar()
+        ttk.Entry(self, textvariable=self.name_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Description:").pack(pady=5, anchor=tk.W)
+        self.desc_var = tk.StringVar()
+        ttk.Entry(self, textvariable=self.desc_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Category:").pack(pady=5, anchor=tk.W)
+        self.category_var = tk.StringVar()
+        ttk.Entry(self, textvariable=self.category_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Current Quantity:").pack(pady=5, anchor=tk.W)
+        self.qty_var = tk.IntVar()
+        ttk.Entry(self, textvariable=self.qty_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Case Size:").pack(pady=5, anchor=tk.W)
+        self.case_size_var = tk.IntVar(value=1)  # Default case size is 1
+        ttk.Entry(self, textvariable=self.case_size_var).pack(fill=tk.X, padx=10)
+        
+        ttk.Label(self, text="Unit Price ($):").pack(pady=5, anchor=tk.W)
+        self.price_var = tk.DoubleVar()
+        ttk.Entry(self, textvariable=self.price_var).pack(fill=tk.X, padx=10)
+        
+        # Add Save button
+        save_button = ttk.Button(self, text="Save", command=self.save_new_item)
+        save_button.pack(pady=20)
+    
+    def save_new_item(self):
+        """Save the new product to the database."""
+        # Get input values
+        product_data = {
+            "upc": self.upc_var.get(),
+            "product_name": self.name_var.get(),
+            "description": self.desc_var.get(),
+            "category": self.category_var.get(),
+            "current_quantity": self.qty_var.get(),
+            "case_size": self.case_size_var.get(),
+            "unit_price": self.price_var.get()
+        }
+        
+        # Validate inputs
+        if not product_data["upc"] or not product_data["product_name"]:
+            messagebox.showerror("Input Error", "UPC and Product Name are required.")
+            return
+        
+        if product_data["case_size"] < 1:
+            messagebox.showerror("Input Error", "Case size must be at least 1.")
+            return
+        
+        try:
+            with self.controller.db_connection.cursor() as cursor:
+                # Insert the new product into the database
+                query = """
+                    INSERT INTO products (upc, product_name, description, category, 
+                                          current_quantity, case_size, unit_price)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(query, (
+                    product_data["upc"],
+                    product_data["product_name"],
+                    product_data["description"],
+                    product_data["category"],
+                    product_data["current_quantity"],
+                    product_data["case_size"],
+                    product_data["unit_price"]
+                ))
+                self.controller.db_connection.commit()
+                messagebox.showinfo("Success", "New product added successfully.")
+                self.destroy()  # Close the window
+        except pymysql.MySQLError as e:
+            messagebox.showerror("Database Error", f"Error adding product: {e}")
 
 # Run the application if this script is executed directly
 if __name__ == "__main__":
