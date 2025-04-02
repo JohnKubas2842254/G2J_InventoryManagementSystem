@@ -239,7 +239,7 @@ class DashboardFrame(ttk.Frame):
                                    command=lambda: controller.show_frame("ReportsFrame"))
         reports_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # Recent products section (this could be populated from the database)
+        # Recent products section (this should be populated from the database)
         products_label = ttk.Label(self, text="Recent Products:",
                                   style="Subheader.TLabel")
         products_label.pack(anchor=tk.W, pady=(20, 10))
@@ -260,14 +260,9 @@ class DashboardFrame(ttk.Frame):
         self.products_tree.column("Name", width=400)
         self.products_tree.column("Quantity", width=100)
         
-        # Add scrollbar
-        products_scrollbar = ttk.Scrollbar(self, orient="vertical", 
-                                          command=self.products_tree.yview)
-        self.products_tree.configure(yscrollcommand=products_scrollbar.set)
-        
-        # Pack the treeview and scrollbar
+        # Pack the treeview
         self.products_tree.pack(fill=tk.BOTH, expand=True)
-        products_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         
         # Bind double-click event to open product configuration
         self.products_tree.bind("<Double-1>", self.open_product_config)
